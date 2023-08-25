@@ -2,31 +2,21 @@ from collections import UserDict
 from datetime import datetime
 
 
-class Field:
-    pass
+class Field():
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return str(self.value)
 
 
 class Name(Field):
-    def __init__(self, name):
-        self.__name = None
-        self.name = name
-
-    @property
-    def name(self):
-        return self.__name
-
-    @name.setter
-    def name(self, name):
-        if len(name) == 0 or name == None:
-            raise ValueError(f'Name can\'t be empty!')
-        self.__name = name
-
-    def __str__(self):
-        return str(self.name)
+    def __init__(self, name: str):
+        super().__init__(name)
 
 
 class Phone(Field):
-    def __init__(self, phone):
+    def __init__(self, phone: str):
         self.__phone = None
         self.phone = phone
 
@@ -35,17 +25,14 @@ class Phone(Field):
         return self.__phone
 
     @phone.setter
-    def phone(self, phone: str):
-        if not phone.isnumeric():
+    def phone(self, phonenumber: str):
+        if not phonenumber.isnumeric():
             raise ValueError('Phone contains unsupported characters')
-        self.__phone = phone
-
-    def __repr__(self):
-        return str(self.phone)
+        self.__phone = phonenumber
 
 
 class Birthday:
-    def __init__(self, birthday):
+    def __init__(self, birthday: str = None):
         self.__birthday = None
         self.birthday = birthday
 
@@ -56,64 +43,71 @@ class Birthday:
     @birthday.setter
     def birthday(self, birthday):
         if type(birthday) == tuple:
-            raise ValueError(f'Birthday cant be in 2 dates')
-        try:
-            datetime.strptime(birthday, '%Y-%m-%d')
-        except ValueError:
-            raise ValueError('Data must be yyyy-mm-dd')
+            raise ValueError(f'Birthday can not be in 2 dates')
+        if birthday:
+            try:
+                datetime.strptime(birthday, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError('Data must be yyyy-mm-dd')
         self.__birthday = birthday
 
 
-class Record:
-    def __init__(self, name: Name, phone: Phone = None, birthday: Birthday = None):
-        self.birthday = birthday
-        self.name = name
-        self.phone = phone
+class Record():
+    def __init__(self, name: Name, phone=None, birthday=None):
+        self.name = Name(name)
+        self.phone = Phone(phone)
         self.phones = []
         if phone:
             self.add_phone(phone)
+        self.birthday = Birthday(birthday)
 
-    def days_to_birthday(self, birthday):
-        birthday = datetime.strptime(birthday, '%Y-%m-%d')
-        today = datetime.now()
-        birthday = birthday.replace(year=today.year)
-        days_to_date = birthday - today
-        if days_to_date.days < 0:
-            return f'was {days_to_date.days} days ago'
-        return f'{days_to_date.days} days to birthday'
-
-    def add_phone(self, phone: Phone):
+    def add_phone(self, phone: str):
+        phone = Phone(phone)
         self.phones.append(phone)
 
-    def change_phone(self, phone_old: Phone, phone_new: Phone):
-        index = self.__check_phone(phone_old)
-        if index >= 0:
+    def remove_phone(self, phone: str):
+        index = self.find_phone_index(phone)
+        if index is not None:
             self.phones.pop(index)
-            self.phones.insert(index, phone_new)
-            return f"Phone {phone_old.phone} success change to phone {phone_new.phone}"
-        return f'Phone {phone_old.phone} dos not in phones'
 
-    def delete_phone(self, phone: Phone):
-        index = self.__check_phone(phone)
-        if index >= 0:
-            self.phones.pop(index)
-            return f'Phone {phone.phone} was deleted'
-        return f'Phone {phone.phone} dos not in phones'
+    def edit_phone(self, old_phone: str, new_phone: str):
+        index = self.find_phone_index(old_phone)
+        if index is not None:
+            self.phones[index] = Phone(new_phone)
 
-    def __check_phone(self, phone: Phone) -> int | None:
-        for i, p in enumerate(self.phones):
-            if p.phone == phone.phone:
-                return i
+    def find_phone_index(self, old_phone: str):
+        for index, phone in enumerate(self.phones):
+            if phone.phone == old_phone:
+                return index
+        return None
+
+    def days_to_birthday(self):
+        # 2023-08-24
+        if self.birthday.birthday:
+            datetime_of_birthday = datetime.strptime(
+                self.birthday.birthday, '%Y-%m-%d')
+            month_of_birthday = datetime_of_birthday.month
+            date_of_today = datetime.now().date()
+            this_year = date_of_today.year
+            this_month = date_of_today.month
+            if this_month < month_of_birthday:
+                target_birthday_day = datetime_of_birthday.replace(
+                    year=this_year)
+            else:
+                target_birthday_day = datetime_of_birthday.replace(
+                    year=this_year + 1)
+
+            time_delta = target_birthday_day.date() - date_of_today
+            return time_delta.days
         return None
 
     def __repr__(self) -> str:
-        return f"{self.name.name} : {', '.join([p.phone for p in self.phones])} : {self.birthday.birthday} ({self.days_to_birthday(self.birthday.birthday)})"
+        return f"{self.name}: {', '.join(str(p.phone) for p in self.phones)}  was_born: {self.birthday.birthday}  days_to_birthday: {self.days_to_birthday()}\n"
 
 
 class AddressBook(UserDict):
-
-    def add_record(self, record: Record):
-        self.data[record.name.name] = record
+    def add_record(self, record):
+        self.data[record.name.value] = record
 
     def iterator(self, N=None):
         start = 0
@@ -122,7 +116,7 @@ class AddressBook(UserDict):
                 result = list(self.data.values())[start:start+N]
             else:
                 result = list(self.data.values())[start:]
-                return result
+                yield result
             if not result:
                 break
             yield result
@@ -133,21 +127,14 @@ class AddressBook(UserDict):
 
 
 if __name__ == '__main__':
-    ab = AddressBook()
-
-    name1 = Name('Anton')
-    phone1 = Phone('1234')
-    bd1 = Birthday('2002-04-11')
-    name2 = Name('Alisa')
-    phone2 = Phone('1111')
-    bd2 = Birthday('2001-1-13')
-    rec1 = Record(name1, phone1, bd1)
-    rec2 = Record(name2, phone2, bd2)
-    ab.add_record(rec1)
-    ab.add_record(rec2)
-    print(ab)
-
-    paginator = ab.iterator(1)
-    for i in paginator:
-        print(i)
-        input('Press any button')
+    new_contact_1 = Record("Nina", "322223322")
+    new_contact_2 = Record("Olga", "1488322")
+    new_contact_3 = Record("Kizaru", "666")
+    new_contact_4 = Record("Gleb", "322", "1993-02-27")
+    new_phone_book = AddressBook()
+    new_phone_book.add_record(new_contact_1)
+    new_phone_book.add_record(new_contact_2)
+    new_phone_book.add_record(new_contact_3)
+    new_phone_book.add_record(new_contact_4)
+    print(new_phone_book)
+    print(datetime.now())
